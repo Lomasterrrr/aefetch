@@ -226,6 +226,7 @@ __styleansi(char *buf, int n, u_int style, const char **styles)
 				*++buf = *styles[i]++;
 		}
 	}
+
 end:
 	*++buf = 'm';
 	*++buf = 0;

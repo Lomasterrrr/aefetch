@@ -16,43 +16,6 @@
 
 #include "../config.h"
 
-/*
- *	B E G I N
- *
- * begins fetch: allocates
- * memory for its size, sets
- * the location, and returns
- * the object.
- */
-inline static FETCH *
-begin(void)
-{
-	FETCH *f;
-	if (!(f = calloc(1, sizeof(FETCH))))
-		return NULL;
-	memset(f, 0, sizeof(FETCH));
-	setlocale(LC_ALL, "");
-	return f;
-}
-
-/*
- *	C O N F I G
- *
- * applies config to FETCH
- * object
- */
-inline static void
-config(FETCH *fetch)
-{
-	if (!fetch)
-		return;
-
-	fetch->lines = LINES;
-	fetch->data.logo = LOGO;
-	fetch->data.linesn = sizeof(LINES) / sizeof(*LINES);
-	fetch->data.logon = sizeof(LOGO) / sizeof(*LOGO);
-}
-
 inline static void
 getstyleline(FETCHSTYLE *style, size_t n, char *fg, char *bg, char *son,
     char *soff)
@@ -74,9 +37,8 @@ fillspace(char *buf, size_t n, size_t max)
 /*
  * 	C O M P I L E
  *
- * displays fetch along with
- * the logo and all styling;
- * main function
+ * displays fetch along with the logo
+ * and all styling; main function
  */
 inline static void
 compile(FETCH *fetch)
@@ -137,27 +99,24 @@ compile(FETCH *fetch)
 }
 
 /*
- * 	E N D
- *
- * clears the memory from
- * under FETCH, returns 0
- */
-inline static int
-end(FETCH *fetch)
-{
-	if (fetch)
-		free(fetch);
-	return 0;
-}
-
-/*
  * 	A E F E T C H
  */
 int
 main(void)
 {
-	FETCH *fetch = begin();
-	config(fetch);
+	FETCH *fetch;
+
+	setlocale(LC_ALL, "");
+	if (!(fetch = calloc(1, sizeof(*fetch))))
+		return 1;
+
+	memset(fetch, 0, sizeof(*fetch));
+	fetch->lines = LINES;
+	fetch->data.logo = LOGO;
+	fetch->data.linesn = sizeof(LINES) / sizeof(*LINES);
+	fetch->data.logon = sizeof(LOGO) / sizeof(*LOGO);
+
 	compile(fetch);
-	return end(fetch);
+	free(fetch);
+	return 0;
 }
