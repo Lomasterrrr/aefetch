@@ -1,34 +1,20 @@
 /*
- * Copyright (c) 2025, ktotonokto, AE-FOUNDATION
+ * Copyright (c) 2026, Ae-foundation. All rights reserved.
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
+ * Permission to use, copy, modify, and/or distribute this software for
+ * any purpose with or without fee is hereby granted, provided that the
+ * software name includes “ae”.
  *
- * 1. Redistributions of source code must retain the above copyright notice, this
- *    list of conditions and the following disclaimer.
- *
- * 2. Redistributions in binary form must reproduce the above copyright notice,
- *    this list of conditions and the following disclaimer in the documentation
- *    and/or other materials provided with the distribution.
- *
- * 3. Neither the name of the copyright holder nor the names of its
- *    contributors may be used to endorse or promote products derived from
- *    this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
- * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
- * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
+ * THE SOFTWARE IS PROVIDED “AS IS” AND THE AUTHOR DISCLAIMS ALL
+ * WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE
+ * FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY
+ * DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN
+ * AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+ * OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ */
 
 #include "../config.h"
-
 
 /*
  *	B E G I N
@@ -38,18 +24,16 @@
  * the location, and returns
  * the object.
  */
-inline static FETCH *BEGIN(void)
+inline static FETCH *
+begin(void)
 {
 	FETCH *f;
-	if (!(f=calloc(1,sizeof(FETCH))))
+	if (!(f = calloc(1, sizeof(FETCH))))
 		return NULL;
-	memset(f,0,sizeof(FETCH));
-	setlocale(LC_ALL,"");
+	memset(f, 0, sizeof(FETCH));
+	setlocale(LC_ALL, "");
 	return f;
 }
-
-
-
 
 /*
  *	C O N F I G
@@ -57,17 +41,35 @@ inline static FETCH *BEGIN(void)
  * applies config to FETCH
  * object
  */
-inline static void CONFIG(FETCH *f)
+inline static void
+config(FETCH *fetch)
 {
-	assert(f);
-	f->lines=LINES;
-	f->data.logo=LOGO;
-	f->data.linesn=sizeof(LINES)/sizeof(LINES[0]);
-	f->data.logon=sizeof(LOGO)/sizeof(LOGO[0]);
+	if (!fetch)
+		return;
+
+	fetch->lines = LINES;
+	fetch->data.logo = LOGO;
+	fetch->data.linesn = sizeof(LINES) / sizeof(*LINES);
+	fetch->data.logon = sizeof(LOGO) / sizeof(*LOGO);
 }
 
+inline static void
+getstyleline(FETCHSTYLE *style, size_t n, char *fg, char *bg, char *son,
+    char *soff)
+{
+	setstyleansi(son, n, style->style);
+	unsetstyleansi(soff, n, style->style);
+	hex2ansi(style->fg, true, true, false, fg, n);
+	hex2ansi(style->bg, false, true, false, bg, n);
+}
 
-
+static inline void
+fillspace(char *buf, size_t n, size_t max)
+{
+	n = n >= max ? max - 1 : n;
+	memset(buf, ' ', n);
+	buf[n] = 0;
+}
 
 /*
  * 	C O M P I L E
@@ -76,114 +78,63 @@ inline static void CONFIG(FETCH *f)
  * the logo and all styling;
  * main function
  */
-inline static void COMPILE(FETCH *f)
+inline static void
+compile(FETCH *fetch)
 {
-	char	res[65535];
-	char	desc[2048];
-	char	val[4028];
-	char	tval[2048];
-	char	logo[2048];
+	char bg[512], fg[512], son[512], soff[512];
+	char desc[2048], skip[512], tval[2048];
+	size_t logon = 0, off, n, i;
 
-	char	bg[512];
-	char	fg[512];
-	char	s_on[64];
-	char	s_off[64];
-	char	skip[512];
-
-	size_t	n;
-	size_t	n1;
-	size_t	logon;
-	size_t	off;
-
-	assert(f);
-
-	for (n=off=0;n!=f->data.logon;n++)
-		if ((ansistrlen(f->data.logo[n]))>off)
-			off=ansistrlen(f->data.logo[n]);
+	if (!fetch)
+		return;
+	for (n = 0; n < fetch->data.logon; n++)
+		if ((ansistrlen(fetch->data.logo[n])) > off)
+			off = ansistrlen(fetch->data.logo[n]);
 	off++;
-
-	for (n=logon=0;n<f->data.linesn;n++) {
-		if (f->lines[n].skip>0) {
-			for (n1=0;n1<f->lines[n].skip;n1++) {
-				if (logon!=f->data.logon) {
-					fprintf(stdout,"%s\n",f->data.logo[logon]);
-					++logon;
-				}
-				else
-					fprintf(stdout,"\n");
-			}
+	for (n = 0; n < fetch->data.linesn; n++) {
+		i = fetch->lines[n].skip;
+		while (i--) {
+			if (logon < fetch->data.logon)
+				puts(fetch->data.logo[logon++]);
+			else
+				putchar('\n');
 		}
 
-		bzero(logo,sizeof(logo));
-		bzero(s_on,sizeof(s_on));
-		bzero(s_off,sizeof(s_off));
-		bzero(fg,sizeof(fg));
-		bzero(bg,sizeof(bg));
-		bzero(skip,sizeof(bg));
+		if (logon < fetch->data.logon)
+			logon++;
 
-		if (logon!=f->data.logon) {
-			snprintf(logo,sizeof(logo),"%s",f->data.logo[logon]);
-			++logon;
-		}
+		getstyleline(&fetch->lines[n].style, sizeof(son), fg, bg, son,
+		    soff);
 
-		set_styleansi(s_on,sizeof(s_on),f->lines[n].style.style);
-		unset_styleansi(s_off,sizeof(s_off),f->lines[n].style.style);
-		hex2ansi(f->lines[n].style.fg,true,true,false,fg,sizeof(fg));
-		hex2ansi(f->lines[n].style.bg,false,true,false,bg,sizeof(bg));
+		fillspace(skip, fetch->lines[n].space, sizeof(skip));
 
-		n1=f->lines[n].space;
-		if (n1>=sizeof(skip))
-			n1=sizeof(skip)-1;
-		memset(skip,' ',n1);
-		skip[n1]='\0';
+		snprintf(desc, sizeof(desc), "%s%s%s%s%s%s%s", bg, fg, son,
+		    (fetch->lines[n].desc) ? fetch->lines[n].desc : "", soff,
+		    ANSI_RESET, skip);
 
-		snprintf(desc,sizeof(desc),"%s%s%s%s%s%s%s",bg,fg,s_on,
-			(f->lines[n].desc)?f->lines[n].desc:"",
-			s_off,ANSI_RESET,skip);
+		getstyleline(&fetch->lines[n].styleval, sizeof(son), fg, bg,
+		    son, soff);
 
-		bzero(s_on,sizeof(s_on));
-		bzero(s_off,sizeof(s_off));
-		bzero(fg,sizeof(fg));
-		bzero(bg,sizeof(bg));
-		bzero(tval,sizeof(bg));
-		bzero(val,sizeof(bg));
-		bzero(res,sizeof(res));
-		bzero(skip,sizeof(skip));
+		if (fetch->lines[n].value)
+			fetch->lines[n].value(tval, sizeof(tval));
+		else if (fetch->lines[n].resval)
+			snprintf(tval, sizeof(tval), "%s",
+			    fetch->lines[n].resval);
 
-		set_styleansi(s_on,sizeof(s_on),f->lines[n].styleval.style);
-		unset_styleansi(s_off,sizeof(s_off),f->lines[n].styleval.style);
-		hex2ansi(f->lines[n].styleval.fg,true,true,false,fg,sizeof(fg));
-		hex2ansi(f->lines[n].styleval.bg,false,true,false,bg,sizeof(bg));
+		fillspace(skip,
+		    (off > ansistrlen(fetch->data.logo[logon]) ?
+			    off - ansistrlen(fetch->data.logo[logon]) - 1 :
+			    i) +
+			fetch->lines[n].spacel,
+		    sizeof(skip));
 
-		if (f->lines[n].value)
-			f->lines[n].value(tval,sizeof(tval));
-		else {
-			if (f->lines[n].resvalue)
-				snprintf(tval,sizeof(tval),"%s",f->lines[n].resvalue);
-		}
-
-		snprintf(val,sizeof(val),"%s%s%s%s%s%s",bg,fg,s_on,
-			tval,s_off,ANSI_RESET);
-
-		if (off>ansistrlen(logo))
-			n1=off-ansistrlen(logo)-1;
-		n1+=f->lines[n].spacel;
-		if (n1>=sizeof(skip))
-			n1=sizeof(skip)-1;
-		memset(skip,' ',n1);
-		skip[n1]='\0';
-
-		snprintf(res,sizeof(res),"%s%s%s%s",logo,skip,desc,val);
-		fprintf(stdout,"%s\n",res);
+		printf("%s%s%s%s%s%s%s%s%s\n", fetch->data.logo[logon], skip,
+		    desc, bg, fg, son, tval, soff, ANSI_RESET);
 	}
-	while (logon!=f->data.logon) {
-		fprintf(stdout,"%s\n",f->data.logo[logon]);
-		++logon;
-	}
+
+	while (logon < fetch->data.logon)
+		puts(fetch->data.logo[logon++]);
 }
-
-
-
 
 /*
  * 	E N D
@@ -191,23 +142,22 @@ inline static void COMPILE(FETCH *f)
  * clears the memory from
  * under FETCH, returns 0
  */
-inline static int END(FETCH* f)
+inline static int
+end(FETCH *fetch)
 {
-	assert(f);
-	free(f);
+	if (fetch)
+		free(fetch);
 	return 0;
 }
 
-
-
-
 /*
- * 	M A I N ()
+ * 	A E F E T C H
  */
-int main(int c, char **av)
+int
+main(void)
 {
-	FETCH *f=BEGIN();
-	CONFIG(f);
-	COMPILE(f);
-	return END(f);
+	FETCH *fetch = begin();
+	config(fetch);
+	compile(fetch);
+	return end(fetch);
 }

@@ -1,344 +1,247 @@
 /*
- * Copyright (c) 2025, ktotonokto, AE-FOUNDATION
+ * Copyright (c) 2026, Ae-foundation. All rights reserved.
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
+ * Permission to use, copy, modify, and/or distribute this software for
+ * any purpose with or without fee is hereby granted, provided that the
+ * software name includes “ae”.
  *
- * 1. Redistributions of source code must retain the above copyright notice, this
- *    list of conditions and the following disclaimer.
- *
- * 2. Redistributions in binary form must reproduce the above copyright notice,
- *    this list of conditions and the following disclaimer in the documentation
- *    and/or other materials provided with the distribution.
- *
- * 3. Neither the name of the copyright holder nor the names of its
- *    contributors may be used to endorse or promote products derived from
- *    this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
- * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
- * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
+ * THE SOFTWARE IS PROVIDED “AS IS” AND THE AUTHOR DISCLAIMS ALL
+ * WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE
+ * FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY
+ * DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN
+ * AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+ * OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ */
 
 #include "../include/include.h"
 
+static inline u_char
+hexval(u_char ch)
+{
+	if (ch >= '0' && ch <= '9')
+		return (u_char)(ch - '0');
+	if (ch >= 'a' && ch <= 'f')
+		return (u_char)(ch - 'a' + 10);
+	if (ch >= 'A' && ch <= 'F')
+		return (u_char)(ch - 'A' + 10);
+	return 255;
+}
+
 static inline bool
-parse_hex(const char *s, int *r, int *g, int *b)
+parsehex(const char *s, u_char *r, u_char *g, u_char *b)
 {
-	unsigned	v[3]={0,0,0};
-	size_t		n;
-	int		i;
-	int		hi;
-	int		lo;
-	int		c;
-	u_int		nib;
+	u_char v[3], hi, lo;
+	size_t n = 0;
 
-	if(!s)
-		return false;
-	if(*s=='#')
-		s++;
+	if (!s || !r || !g || !b)
+		return 0;
+	if (*s == '#')
+		++s;
 
-	n=strlen(s);
-	if(n==6) {
-		for(i=0;i<3;++i){
-			hi=s[i*2],lo=s[i*2+1];
-			if(!isxdigit(hi)||!isxdigit(lo))
-				return false;
-			v[i]=(unsigned)(strtol((char[]){(char)hi,0},NULL,16)<<4)|
-				(unsigned)strtol((char[]){(char)lo,0},NULL,16);
-        	}
-	}
-	else if(n==3) {
-		for(i=0;i<3;++i) {
-			c=s[i];
-			if(!isxdigit(c))
-				return false;
-			nib=(u_int)strtol((char[]){(char)c,0},NULL,16);
-			v[i]=(nib<<4)|nib;
+	n = strlen(s);
+	switch (n) {
+	case 6:
+		for (n = 0; n < 3; n++) {
+			hi = hexval(s[n * 2]);
+			lo = hexval(s[n * 2 + 1]);
+			if (hi > 15 || lo > 15)
+				return 0;
+			v[n] = (u_char)((hi << 4) | lo);
 		}
+		break;
+	case 3:
+		for (n = 0; n < 3; n++) {
+			hi = hexval(s[n]);
+			if (hi > 15)
+				return 0;
+			v[n] = (u_char)((hi << 4) | hi);
+		}
+		break;
+	default:
+		return 0;
 	}
-	else
-		return false;
 
-	*r=(int)v[0];
-	*g=(int)v[1];
-	*b=(int)v[2];
+	*r = v[0];
+	*g = v[1];
+	*b = v[2];
 
-	return true;
+	return 1;
 }
 
 static inline double
-srgb_to_linear(double c)
+srgbtolinear(double c)
 {
-	c/=255.0;
-	return (c<=0.04045)?(c/12.92):
-		pow((c+0.055)/1.055,2.4);
+	c /= 255.0;
+	return (c <= 0.04045) ? (c / 12.92) : pow((c + 0.055) / 1.055, 2.4);
 }
 
-
-inline static void
-rgb_to_xyz(double R, double G, double B,
-		double *X, double *Y, double *Z)
+static inline void
+rgbtolab(u_char r, u_char g, u_char b, double *L, double *a, double *B)
 {
-    double r=srgb_to_linear(R);
-    double g=srgb_to_linear(G);
-    double b=srgb_to_linear(B);
+	double fx, fy, fz;
+	double X, Y, Z;
 
-    *X=0.4124564*r+0.3575761*g+0.1804375*b;
-    *Y=0.2126729*r+0.7151522*g+0.0721750*b;
-    *Z=0.0193339*r+0.1191920*g+0.9503041*b;
-}
+	fx = srgbtolinear(r);
+	fy = srgbtolinear(g);
+	fz = srgbtolinear(b);
 
-static inline double
-f_lab(double t)
-{
-	const double d=6.0/29.0;
-	const double d3=d*d*d;
+	X = 0.4124564 * fx + 0.3575761 * fy + 0.1804375 * fz;
+	Y = 0.2126729 * fx + 0.7151522 * fy + 0.0721750 * fz;
+	Z = 0.0193339 * fx + 0.1191920 * fy + 0.9503041 * fz;
 
-	return (t>d3)?cbrt(t):(t/(3*d*d)+4.0/29.0);
-}
+#define flab(t)                                              \
+	(t > ((6.0 / 29.0) * (6.0 / 29.0) * (6.0 / 29.0))) ? \
+	    cbrt(t) :                                        \
+	    (t / (3 * (6.0 / 29.0) * (6.0 / 29.0)) + 4.0 / 29.0);
 
-inline static void
-rgb_to_lab(int R, int G, int B, double *L, double *a, double *b)
-{
-    const double Xn=0.95047,Yn=1.00000,Zn=1.08883;
-    double fx,fy,fz;
-    double X,Y,Z;
+	fx = flab(X / 0.95047);
+	fy = flab(Y / 1.00000);
+	fz = flab(Z / 1.08883);
+#undef flab
 
-    rgb_to_xyz(R,G,B,&X,&Y,&Z);
-
-    fx=f_lab(X/Xn);
-    fy=f_lab(Y/Yn);
-    fz=f_lab(Z/Zn);
-
-    *L=116.0*fy-16.0;
-    *a=500.0*(fx-fy);
-    *b=200.0*(fy-fz);
+	*L = 116.0 * fy - 16.0;
+	*a = 500.0 * (fx - fy);
+	*B = 200.0 * (fy - fz);
 }
 
 static inline double
-deltaE2_Lab(int r1,int g1,int b1,int r2,int g2,int b2)
+deltaE2Lab(u_char r1, u_char g1, u_char b1, u_char r2, u_char g2, u_char b2)
 {
-	double L1,a1,b1c,L2,a2,b2c;
+	double L1, a1, b1c, L2, a2, b2c;
+	rgbtolab(r1, g1, b1, &L1, &a1, &b1c);
+	rgbtolab(r2, g2, b2, &L2, &a2, &b2c);
+	double dL = L1 - L2, da = a1 - a2, db = b1c - b2c;
+	return dL * dL + da * da + db * db; /* CIE76^2 */
+}
 
-	rgb_to_lab(r1,g1,b1,&L1,&a1,&b1c);
-	rgb_to_lab(r2,g2,b2,&L2,&a2,&b2c);
-	double dL=L1-L2, da=a1-a2, db=b1c-b2c;
-	return dL*dL+da*da+db*db;	/* CIE76^2 */
+static const int L[6] = { 0, 95, 135, 175, 215, 255 };
+static const int base16[16][3] = { { 0, 0, 0 }, { 205, 0, 0 }, { 0, 205, 0 },
+	{ 205, 205, 0 }, { 0, 0, 238 }, { 205, 0, 205 }, { 0, 205, 205 },
+	{ 229, 229, 229 }, { 127, 127, 127 }, { 255, 0, 0 }, { 0, 255, 0 },
+	{ 255, 255, 0 }, { 92, 92, 255 }, { 255, 0, 255 }, { 0, 255, 255 },
+	{ 255, 255, 255 } };
+
+static inline void
+indextorgb256(int idx, u_char *r, u_char *g, u_char *b)
+{
+	u_char i, k, r6, g6, b6, v;
+
+	if (idx >= 16 && idx <= 231) {
+		k = idx - 16;
+		r6 = k / 36;
+		g6 = (k % 36) / 6;
+		b6 = k % 6;
+#define level6(i) L[i < 0 ? 0 : i > 5 ? 5 : i]
+		*r = level6(r6);
+		*g = level6(g6);
+		*b = level6(b6);
+#undef level6
+	} else if (idx >= 232 && idx <= 255) {
+		v = 8 + 10 * (idx - 232);
+		*r = *g = *b = v;
+	} else {
+		i = (idx < 0 ? 0 : idx > 15 ? 15 : idx);
+		*r = base16[i][0];
+		*g = base16[i][1];
+		*b = base16[i][2];
+	}
 }
 
 static inline int
-level6(int i)
+xterm256index(u_char r, u_char g, u_char b, bool base16)
 {
-	static const int L[6]={0,95,135,175,215,255};
-	return L[i<0?0:i>5?5:i];
+	double best = 1e100, d2;
+	int best_idx = 16, idx;
+	u_char rr, gg, bb;
+
+	for (idx = base16 ? 0 : 16; idx <= 255; ++idx) {
+		indextorgb256(idx, &rr, &gg, &bb);
+		d2 = deltaE2Lab(r, g, b, rr, gg, bb);
+		if (d2 < best) {
+			best = d2;
+			best_idx = idx;
+		}
+	}
+
+	return best_idx;
 }
 
-inline static void
-index_to_rgb_256(int idx, int *r, int *g, int *b)
+static inline bool
+truecolorsupport(void)
 {
-        static const int base16[16][3]={
-		{0,0,0},{205,0,0},{0,205,0},{205,205,0},
-		{0,0,238},{205,0,205},{0,205,205},{229,229,229},
-		{127,127,127},{255,0,0},{0,255,0},{255,255,0},
-		{92,92,255},{255,0,255},{0,255,255},{255,255,255}
-        };
+	const char *s;
+	s = getenv("COLORTERM");
+	if (s && (strstr(s, "truecolor") || strstr(s, "24bit")))
+		return 1;
+	s = getenv("TERM");
+	if (s && strstr(s, "-truecolor"))
+		return 1;
+	return 0;
+}
+
+int
+hex2ansi(const char *hex, bool fg, bool truecolor, bool base16, char *buf,
+    size_t n)
+{
+	u_char R, G, B;
+
+	if (!hex || !buf || n < 8)
+		return 0;
+	if (!parsehex(hex, &R, &G, &B))
+		return 0;
+
+	/* true color */
+	if (truecolor && truecolorsupport())
+		return snprintf(buf, n, "\x1b[%hhu;2;%hhu;%hhu;%hhum",
+		    fg ? 38 : 48, R, G, B);
+
+	/* xterm color */
+	return snprintf(buf, n, "\x1b[%hhu;5;%hhum", fg ? 38 : 48,
+	    xterm256index(R, G, B, base16));
+}
+
+static bool
+__styleansi(char *buf, int n, u_int style, const char **styles)
+{
+	bool flag = 0;
 	int i;
-	int k;
-	int r6;
-	int g6;
-	int b6;
-	int v;
 
-	if (idx>=16&&idx<=231) {
-		k=idx-16;
-		r6=k/36;
-		g6=(k%36)/6;
-		b6=k%6;
-		*r=level6(r6);
-		*g=level6(g6);
-		*b=level6(b6);
-	}
-	else if (idx>=232&&idx<=255) {
-		v=8+10*(idx-232);
-		*r=*g=*b=v;
-	}
-	else {
-		i=(idx<0?0:idx>15?15:idx);
-		*r=base16[i][0];
-		*g=base16[i][1];
-		*b=base16[i][2];
-	}
-}
-
-inline static int
-nearest_xterm256_index(int R, int G, int B, bool allow_base16)
-{
-    double best=1e100;
-    int best_idx=16;
-    int start=allow_base16?0:16;
-    int idx;
-    int rr,gg,bb;
-    double d2;
-
-    for (idx=start;idx<=255;++idx) {
-        index_to_rgb_256(idx,&rr,&gg,&bb);
-        d2=deltaE2_Lab(R,G,B,rr,gg,bb);
-        if (d2<best) {
-		best=d2;
-		best_idx=idx;
-	}
-    }
-
-    return best_idx;
-}
-
-inline static bool
-terminal_supports_truecolor(void)
-{
-	const char *term;
-	const char *ct;
-
-	ct=getenv("COLORTERM");
-	if (ct&&(strstr(ct,"truecolor")||strstr(ct,"24bit")))
-		return true;
-	term=getenv("TERM");
-	if (term&&strstr(term,"-truecolor"))
-		return true;
-
-	return false;
-}
-
-size_t hex2ansi(const char *hex, bool foreground, bool prefer_truecolor,
-		bool allow_base16, char *out, size_t outsz)
-{
-	int R,G,B;
-	int idx;
-
-	if (!out||outsz<8)
-		return 0;
-	if (!parse_hex(hex,&R,&G,&B))
+	if (!buf || n < 5 || !style)
 		return 0;
 
-	/*
-	 * true colors
-	 * \x1b[38;2;R;G;Bm	or	\x1b[48;2;R;G;Bm
-	 */
-	if (prefer_truecolor&&terminal_supports_truecolor()) {
-		return (size_t)snprintf(out,outsz,"\x1b[%d;2;%d;%d;%dm",
-			foreground?38:48,R,G,B);
-	}
+	*buf++ = '\x1b';
+	*buf = '[';
+	n -= 4; /* and 'm' + 0 */
 
-	/* xterm colors */
-	idx=nearest_xterm256_index(R,G,B,allow_base16);
-	return (size_t)snprintf(out,outsz,"\x1b[%d;5;%dm",
-		foreground?38:48,idx);
+	for (i = 0; i <= 6; i++) {
+		if (style & (1u << i)) {
+			if ((n -= strlen(styles[i]) + flag) < 0)
+				goto end;
+			if (flag)
+				*++buf = ';';
+			else
+				flag = 1;
+			while (*styles[i])
+				*++buf = *styles[i]++;
+		}
+	}
+end:
+	*++buf = 'm';
+	*++buf = 0;
+	return 1;
 }
 
-
-
-static int append_code(char *out, size_t outsz, int n, const char *code, int *first)
+bool
+setstyleansi(char *buf, int n, u_int style)
 {
-	int rc;
-	if (n<0||(size_t)n>=outsz)
-		return n;
-	rc=snprintf(out+n,outsz-(size_t)n,*first?"%s":";%s",code);
-	if (rc<0)
-		return n;
-	*first=0;
-	return n+rc;
+	const char *styles[] = { "1", "2", "3", "4", "9", "7", "53" };
+	return __styleansi(buf, n, style, styles);
 }
 
-size_t set_styleansi(char *out, size_t outsz, u_int flags)
+size_t
+unsetstyleansi(char *buf, size_t n, u_int style)
 {
-	int first;
-	int n;
-
-	if (!out||outsz<4||flags==0){
-		if(out&&outsz)
-			out[0]='\0';
-		return 0; 
-	}
-
-	n=snprintf(out,outsz,"\x1b[");
-	first=1;
-
-	if (flags&ANSI_S_BOLD)
-		n=append_code(out,outsz,n,"1",&first);
-	if (flags&ANSI_S_DIM)
-		n=append_code(out,outsz,n,"2",&first);
-	if (flags&ANSI_S_ITALIC)
-		n=append_code(out,outsz,n,"3",&first);
-	if (flags&ANSI_S_UNDERLINE)
-		n=append_code(out,outsz,n,"4",&first);
-	if (flags&ANSI_S_INVERSE)
-		n=append_code(out,outsz,n,"7",&first);
-	if (flags&ANSI_S_STRIKE)
-		n=append_code(out,outsz,n,"9",&first);
-	if (flags&ANSI_S_OVERLINE)
-		n=append_code(out,outsz,n,"53",&first);
-
-	if (first) {
-		out[0]='\0';
-		return 0;
-	}
-
-	if (n>=0&&(size_t)n<outsz-1) {
-		out[n++]='m';
-		out[n]='\0';
-	}
-	else if (outsz)
-		out[outsz-1]='\0';
-
-
-	return (size_t)n;
-}
-
-size_t unset_styleansi(char *out, size_t outsz, u_int flags)
-{
-	int first;
-	int n;
-
-	if (!out||outsz<4||flags==0){
-		if(out&&outsz)
-			out[0]='\0';
-		return 0; 
-	}
-
-	n=snprintf(out,outsz,"\x1b[");
-	first=1;
-
-	if (flags&(ANSI_S_BOLD|ANSI_S_DIM))
-		n=append_code(out,outsz,n,"22",&first);
-	if (flags&ANSI_S_ITALIC)
-		n=append_code(out,outsz,n,"23",&first);
-	if (flags&ANSI_S_UNDERLINE)
-		n=append_code(out,outsz,n,"24",&first);
-	if (flags&ANSI_S_INVERSE)
-		n=append_code(out,outsz,n,"27",&first);
-	if (flags&ANSI_S_STRIKE)
-		n=append_code(out,outsz,n,"29",&first);
-	if (flags&ANSI_S_OVERLINE)
-		n=append_code(out,outsz,n,"55",&first);
-
-	if (first) {
-		out[0]='\0';
-		return 0;
-	}
-
-	if (n>=0&&(size_t)n<outsz-1) {
-		out[n++]='m';
-		out[n]='\0';
-	}
-	else if (outsz)
-		out[outsz-1]='\0';
-
-	return (size_t)n;
+	const char *styles[] = { "22", "22", "23", "24", "29", "27", "55" };
+	return __styleansi(buf, n, style, styles);
 }
