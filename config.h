@@ -35,7 +35,7 @@ static const char *LOGO[] = {
 
 static FETCHLINE LINES[] = {
 	{ "OS:", 1, { "#FFFF55", "#0000AA", ANSI_S_BOLD }, __osinfo, "Linux",
-	    { "#55FFFF", "#000000", ANSI_S_UNDERLINE | ANSI_S_ITALIC }, 4, 2},
+	    { "#55FFFF", "#000000", ANSI_S_UNDERLINE | ANSI_S_ITALIC }, 4, 2 },
 
 	{ "Hostname:", 1, { "#FFFF55", "#0000AA", ANSI_S_BOLD }, __hostname, "",
 	    { "#55FF55", "#000000", ANSI_S_UNDERLINE | ANSI_S_ITALIC }, 4, 0 },

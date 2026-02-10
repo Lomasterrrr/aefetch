@@ -86,8 +86,7 @@ compile(FETCH *fetch)
 						   "";
 		i = ansistrlen(lp);
 		fillspace(skip,
-		    ((off > i) ? off - i : 0) +
-			fetch->lines[n].spacel,
+		    ((off > i) ? off - i : 0) + fetch->lines[n].spacel,
 		    sizeof(skip));
 
 		printf("%s%s%s%s%s%s%s%s%s\n", lp, skip, desc, bg, fg, son,
