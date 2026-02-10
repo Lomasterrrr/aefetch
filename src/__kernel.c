@@ -34,5 +34,4 @@ __kernel(char *kernel, size_t n)
 
 	snprintf(kernel, n, "%s", un.release);
 	return __OK;
-	;
 }
