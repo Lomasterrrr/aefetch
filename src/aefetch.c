@@ -104,19 +104,11 @@ compile(FETCH *fetch)
 int
 main(void)
 {
-	FETCH *fetch;
-
+	FETCH fetch = { .lines = LINES,
+		.data.logo = LOGO,
+		.data.linesn = sizeof(LINES) / sizeof(*LINES),
+		.data.logon = sizeof(LOGO) / sizeof(*LOGO) };
 	setlocale(LC_ALL, "");
-	if (!(fetch = calloc(1, sizeof(*fetch))))
-		return 1;
-
-	memset(fetch, 0, sizeof(*fetch));
-	fetch->lines = LINES;
-	fetch->data.logo = LOGO;
-	fetch->data.linesn = sizeof(LINES) / sizeof(*LINES);
-	fetch->data.logon = sizeof(LOGO) / sizeof(*LOGO);
-
-	compile(fetch);
-	free(fetch);
+	compile(&fetch);
 	return 0;
 }
