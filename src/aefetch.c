@@ -45,14 +45,16 @@ compile(FETCH *fetch)
 {
 	char bg[512], fg[512], son[512], soff[512];
 	char desc[2048], skip[512], tval[2048];
-	size_t logon = 0, off, n, i;
+	size_t logon = 0, off = 0, n, i;
+	const char *lp;
 
 	if (!fetch)
 		return;
+
 	for (n = 0; n < fetch->data.logon; n++)
 		if ((ansistrlen(fetch->data.logo[n])) > off)
 			off = ansistrlen(fetch->data.logo[n]);
-	off++;
+
 	for (n = 0; n < fetch->data.linesn; n++) {
 		i = fetch->lines[n].skip;
 		while (i--) {
@@ -62,18 +64,12 @@ compile(FETCH *fetch)
 				putchar('\n');
 		}
 
-		if (logon < fetch->data.logon)
-			logon++;
-
 		getstyleline(&fetch->lines[n].style, sizeof(son), fg, bg, son,
 		    soff);
-
 		fillspace(skip, fetch->lines[n].space, sizeof(skip));
-
 		snprintf(desc, sizeof(desc), "%s%s%s%s%s%s%s", bg, fg, son,
 		    (fetch->lines[n].desc) ? fetch->lines[n].desc : "", soff,
 		    ANSI_RESET, skip);
-
 		getstyleline(&fetch->lines[n].styleval, sizeof(son), fg, bg,
 		    son, soff);
 
@@ -83,15 +79,15 @@ compile(FETCH *fetch)
 			snprintf(tval, sizeof(tval), "%s",
 			    fetch->lines[n].resval);
 
+		lp = (logon < fetch->data.logon) ? fetch->data.logo[logon++] :
+						   "";
 		fillspace(skip,
-		    (off > ansistrlen(fetch->data.logo[logon]) ?
-			    off - ansistrlen(fetch->data.logo[logon]) - 1 :
-			    i) +
+		    ((off > ansistrlen(lp)) ? off - ansistrlen(lp) : 0) +
 			fetch->lines[n].spacel,
 		    sizeof(skip));
 
-		printf("%s%s%s%s%s%s%s%s%s\n", fetch->data.logo[logon], skip,
-		    desc, bg, fg, son, tval, soff, ANSI_RESET);
+		printf("%s%s%s%s%s%s%s%s%s\n", lp, skip, desc, bg, fg, son,
+		    tval, soff, ANSI_RESET);
 	}
 
 	while (logon < fetch->data.logon)
