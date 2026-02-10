@@ -70,6 +70,7 @@ compile(FETCH *fetch)
 		snprintf(desc, sizeof(desc), "%s%s%s%s%s%s%s", bg, fg, son,
 		    (fetch->lines[n].desc) ? fetch->lines[n].desc : "", soff,
 		    ANSI_RESET, skip);
+
 		getstyleline(&fetch->lines[n].styleval, sizeof(son), fg, bg,
 		    son, soff);
 
@@ -78,11 +79,14 @@ compile(FETCH *fetch)
 		else if (fetch->lines[n].resval)
 			snprintf(tval, sizeof(tval), "%s",
 			    fetch->lines[n].resval);
+		else
+			*tval = 0;
 
 		lp = (logon < fetch->data.logon) ? fetch->data.logo[logon++] :
 						   "";
+		i = ansistrlen(lp);
 		fillspace(skip,
-		    ((off > ansistrlen(lp)) ? off - ansistrlen(lp) : 0) +
+		    ((off > i) ? off - i : 0) +
 			fetch->lines[n].spacel,
 		    sizeof(skip));
 
