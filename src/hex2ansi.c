@@ -204,17 +204,15 @@ hex2ansi(const char *hex, bool fg, bool truecolor, bool base16, char *buf,
 static bool
 __styleansi(char *buf, int n, u_int style, const char **styles)
 {
-	bool flag = 0;
-	int i;
-
 	if (!buf || n < 5 || !style)
 		return 0;
 
-	*buf++ = '\x1b';
-	*buf = '[';
+	*buf = '\x1b';
+	*++buf = '[';
 	n -= 4; /* and 'm' + 0 */
 
-	for (i = 0; i <= 6; i++) {
+	bool flag = 0;
+	for (int i = 0; i <= 6; i++) {
 		if (style & (1u << i)) {
 			if ((n -= strlen(styles[i]) + flag) < 0)
 				goto end;
